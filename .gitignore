@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data, checkpoints and run outputs
+data/
+checkpoints/
+runs/
+wandb/
+*.pt
+*.pth
+*.ckpt
+*.parquet
