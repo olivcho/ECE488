@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 import torch
 
-from lensless.data import LensedPairDataset, image_to_tensor, split_train_val, train_shard_paths
+from lensless.data import LensedPairDataset, image_to_tensor, load_train_examples, split_train_val, train_shard_paths
 
 
 def test_split_is_disjoint_complete_and_repeatable():
@@ -45,3 +45,28 @@ def test_shard_paths():
     assert train_shard_paths(1) == ["data/train-00000-of-00015.parquet"]
     with pytest.raises(ValueError):
         train_shard_paths(16)
+
+
+def test_load_train_examples_requests_only_training_shards(tmp_path, monkeypatch):
+    """A subset must load, and test files must never be requested."""
+    from datasets import Dataset, Features, Image
+    from PIL import Image as PILImage
+
+    image = PILImage.new("RGB", (8, 6))
+    features = Features({"lensless": Image(), "lensed": Image()})
+    parquet_path = tmp_path / "shard.parquet"
+    Dataset.from_dict({"lensless": [image] * 3, "lensed": [image] * 3}, features=features).to_parquet(parquet_path)
+
+    requested = []
+
+    def fake_download(repo_id, filename, repo_type, cache_dir):
+        requested.append(filename)
+        assert repo_type == "dataset"
+        return str(parquet_path)
+
+    monkeypatch.setattr("huggingface_hub.hf_hub_download", fake_download)
+    examples = load_train_examples(tmp_path / "cache", num_shards=1)
+
+    assert requested == ["data/train-00000-of-00015.parquet"]
+    assert len(examples) == 3
+    assert image_to_tensor(examples[0]["lensless"]).shape == (3, 6, 8)
