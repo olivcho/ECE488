@@ -1,0 +1,13 @@
+{
+  "git": {
+    "commit": "33824adafc737c4a55b2ed8fd6ec2c4487cbbe7c",
+    "uncommitted_changes": true
+  },
+  "environment": {
+    "python": "3.13.2",
+    "torch": "2.15.0",
+    "cuda": null,
+    "device": "mps",
+    "platform": "macOS-15.7.4-arm64-arm-64bit-Mach-O"
+  }
+}

@@ -1,0 +1,20 @@
+# Short Colab test before the full run. Measures seconds per epoch on the GPU.
+experiment: {root: experiments, name: unet_colab_test, technique: unet}
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: 1
+  val_size: 100
+  split_seed: 488
+  max_train_examples: 500
+  max_val_examples: null
+  val_from_train: false
+  num_workers: 2
+model: {base_channels: 32, depth: 4}
+train:
+  seed: 488
+  epochs: 2
+  batch_size: 8
+  learning_rate: 1.0e-4
+  lpips_weight: 1.0
+  eval_every: 1
