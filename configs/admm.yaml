@@ -1,0 +1,22 @@
+# Classical ADMM with TV, scored on the validation split. Penalties come from a 4-image probe, not a real tuning.
+# One setting per run: change a value, run again, and the run folder gets a new version number.
+experiment: {root: experiments, name: admm_baseline, technique: admm}
+seed: 488
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: null        # null matches the U-Net's validation split, which needs every shard
+  val_size: 1000
+  split_seed: 488
+  max_val_examples: 200
+  num_workers: 0
+  batch_size: 8
+psf: {source: huggingface, cache_dir: data/raw/huggingface}
+admm:
+  tau: 1.0e-3
+  mu1: 0.1
+  mu2: 0.1
+  mu3: 0.1
+  iterations: 100
+  eval_at: [5, 10, 20, 50, 100]
+  output_scaling: max       # Rescale each reconstruction to full range, as the dataset did to its images
