@@ -1,0 +1,25 @@
+# Short Colab test before the full Le-ADMM run. Measures seconds per epoch on the GPU.
+experiment: {root: experiments, name: le_admm_colab_test, technique: le_admm}
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: 1
+  val_size: 100
+  split_seed: 488
+  max_train_examples: 500
+  max_val_examples: null
+  val_from_train: false
+  num_workers: 2
+psf: {source: huggingface, cache_dir: data/raw/huggingface}
+model:
+  iterations: 5
+  tau: 1.0e-3
+  mu: 0.03
+  denoiser: {base_channels: 16, depth: 3}
+train:
+  seed: 488
+  epochs: 2
+  batch_size: 8
+  learning_rate: 1.0e-4
+  lpips_weight: 1.0
+  eval_every: 1

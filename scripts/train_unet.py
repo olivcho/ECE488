@@ -126,9 +126,15 @@ def warn_if_code_changed(run_dir: Path) -> None:
         print(f"WARNING: run started at commit {recorded}, resuming at {current}", flush=True)
 
 
-def run(config: dict, checkpoint_root: str | None = None, experiments_root: str | None = None, resume_run: str | None = None) -> Path:
+def build_unet(config: dict, device: str) -> torch.nn.Module:
+    return UNet(**config["model"]).to(device)
+
+
+def run(config: dict, checkpoint_root: str | None = None, experiments_root: str | None = None, resume_run: str | None = None,
+        build_model=build_unet, device: str | None = None) -> Path:
+    """Train any model that maps a lensless image to a lensed one; Le-ADMM reuses this loop with its own builder."""
     seed_everything(config["train"]["seed"])
-    device = pick_device()
+    device = device or pick_device()
     exp, train_cfg = config["experiment"], config["train"]
     if resume_run:
         run_dir = Path(resume_run)
@@ -145,7 +151,7 @@ def run(config: dict, checkpoint_root: str | None = None, experiments_root: str 
     val_loader = DataLoader(val_set, train_cfg["batch_size"], shuffle=False, num_workers=workers)
     print(f"run: {run_dir} | device: {device} | train: {len(train_set)} | val: {len(val_set)}", flush=True)
 
-    model = UNet(**config["model"]).to(device)
+    model = build_model(config, device)
     perceptual_loss = lpips.LPIPS(net="alex", verbose=False).to(device).eval().requires_grad_(False)
     optimizer = torch.optim.Adam(model.parameters(), lr=train_cfg["learning_rate"])
     best_val_loss = float("inf")

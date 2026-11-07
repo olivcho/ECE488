@@ -1,0 +1,26 @@
+# Le-ADMM without a denoiser: only the 5×4 penalties and one gain are learned, so nothing can memorize the camera.
+# This is the cleanest test of the research question: swap the PSF and nothing learned has to change.
+experiment: {root: experiments, name: le_admm_plain, technique: le_admm}
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: null
+  val_size: 1000
+  split_seed: 488
+  max_train_examples: 5000
+  max_val_examples: null
+  val_from_train: false
+  num_workers: 2
+psf: {source: huggingface, cache_dir: data/raw/huggingface}
+model:
+  iterations: 5
+  tau: 1.0e-3
+  mu: 0.03
+  denoiser: null
+train:
+  seed: 488
+  epochs: 3                 # 21 scalars converge in far fewer updates than a U-Net
+  batch_size: 8
+  learning_rate: 1.0e-2     # Steps in log space, so 1e-2 changes a penalty by about 1% per update
+  lpips_weight: 1.0
+  eval_every: 1

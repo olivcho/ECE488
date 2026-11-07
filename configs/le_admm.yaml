@@ -1,0 +1,26 @@
+# Le-ADMM-U: 5 unrolled ADMM iterations with learned τ, μ₁, μ₂, μ₃ per iteration and a U-Net denoiser.
+# Same data split, training rows, loss and U-Net size as unet_small.yaml, so the two are directly comparable.
+experiment: {root: experiments, name: le_admm_unet, technique: le_admm}
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: null        # null loads all 24,000 pairs
+  val_size: 1000
+  split_seed: 488
+  max_train_examples: 5000  # First 5,000 training rows, shared by every model
+  max_val_examples: null
+  val_from_train: false
+  num_workers: 2
+psf: {source: huggingface, cache_dir: data/raw/huggingface}
+model:
+  iterations: 5
+  tau: 1.0e-3               # Starting values from the 4-image probe in EXP-009
+  mu: 0.03
+  denoiser: {base_channels: 16, depth: 3}
+train:
+  seed: 488
+  epochs: 10
+  batch_size: 8
+  learning_rate: 1.0e-4
+  lpips_weight: 1.0
+  eval_every: 1
