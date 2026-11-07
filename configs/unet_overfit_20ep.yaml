@@ -1,0 +1,20 @@
+# Short version of the overfit check: 20 epochs, which is 20 weight updates.
+experiment: {root: experiments, name: unet_overfit_check, technique: unet}
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: 1
+  val_size: 100
+  split_seed: 488
+  max_train_examples: 4
+  max_val_examples: null
+  val_from_train: true      # Scores the training images on purpose
+  num_workers: 0
+model: {base_channels: 16, depth: 4}
+train:
+  seed: 488
+  epochs: 20
+  batch_size: 4
+  learning_rate: 1.0e-3
+  lpips_weight: 0.0
+  eval_every: 5
