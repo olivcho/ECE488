@@ -1,4 +1,4 @@
-"""Score a trained U-Net or Le-ADMM checkpoint on one data split, and test transfer to a new camera.
+"""Score a trained U-Net, Le-ADMM or flow-matching checkpoint on one data split, and test transfer to a new camera.
 
 Four conditions, each a row in metrics.csv:
   real                  the dataset's own measurements, the training camera
@@ -20,6 +20,7 @@ from run_admm import apply_overrides, build_eval_set, build_forward_model, parse
 
 from lensless.admm import ForwardModel, simulate_measurement
 from lensless.experiment import create_run_dir, seed_everything, write_run_metadata
+from lensless.flow_unet import FlowMatching
 from lensless.le_admm import LeADMM
 from lensless.metrics import image_metrics
 from lensless.psf import load_psf_file, prepare_psf, transform_psf
@@ -34,6 +35,9 @@ def load_model(checkpoint_path: str, forward_model: ForwardModel, device: str) -
         model = UNet(**saved["config"]["model"])
     elif technique == "le_admm":
         model = LeADMM(forward_model, **saved["config"]["model"])
+    elif technique == "flow":
+        # Its forward pass runs the Euler sampler, so scoring code treats it like any other model.
+        model = FlowMatching(**saved["config"]["model"])
     else:
         raise ValueError(f"cannot evaluate technique {technique!r}")
     model.load_state_dict(saved["model"])

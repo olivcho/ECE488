@@ -34,8 +34,15 @@ uv run python scripts/train_le_admm.py --config configs/le_admm_plain.yaml
 ```
 On Colab, use `notebooks/train_le_admm_colab.ipynb`.
 
+## Train the flow-matching model
+A conditional flow-matching model: a time-conditioned U-Net with self-attention at the bottleneck predicts the velocity from Gaussian noise to the lensed image, given the lensless measurement as extra input channels. Training samples t uniformly, forms x_t = (1 − t)·noise + t·target and regresses the velocity target − noise with MSE, so `train_loss` in `metrics.csv` is a velocity error rather than an image error. Validation and evaluation sample with a fixed-step Euler integrator (`model.sample_steps`, 20 by default) and score the samples like every other model. `flow.yaml` uses the same data split, training rows and U-Net size as `unet_small.yaml`.
+```bash
+uv run python scripts/train_flow.py --config configs/flow.yaml
+```
+On Colab, use `notebooks/train_flow_colab.ipynb`, starting with `configs/flow_colab_test.yaml` to time one epoch.
+
 ## Score a checkpoint and test the PSF swap
-Every script picks its images with the same split helper, so the U-Net, ADMM and Le-ADMM report on identical train, val and test rows. `evaluate_model.py` scores a U-Net or Le-ADMM checkpoint on one split, under real measurements, measurements simulated with the training PSF, and measurements simulated with a second PSF both before and after swapping it into Le-ADMM. Use `data.split=test` only for final numbers.
+Every script picks its images with the same split helper, so the U-Net, ADMM, Le-ADMM and flow model report on identical train, val and test rows. `evaluate_model.py` scores a U-Net, Le-ADMM or flow-matching checkpoint on one split, under real measurements, measurements simulated with the training PSF, and measurements simulated with a second PSF both before and after swapping it into Le-ADMM. Use `data.split=test` only for final numbers.
 ```bash
 uv run python scripts/evaluate_model.py --config configs/evaluate.yaml --checkpoint experiments/le_admm_plain/<run>/checkpoints/best.pt --set data.split=test
 ```

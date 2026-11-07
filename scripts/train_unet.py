@@ -57,12 +57,17 @@ def compute_loss(prediction, target, perceptual_loss, lpips_weight: float) -> to
     return loss
 
 
-def train_one_epoch(model, loader, optimizer, perceptual_loss, lpips_weight, device) -> float:
+def reconstruction_loss(model, lensless, lensed, perceptual_loss, lpips_weight: float) -> torch.Tensor:
+    """Default training step: score the model's output against the lensed image."""
+    return compute_loss(model(lensless), lensed, perceptual_loss, lpips_weight)
+
+
+def train_one_epoch(model, loader, optimizer, perceptual_loss, lpips_weight, device, train_loss=reconstruction_loss) -> float:
     model.train()
     total_loss, total_images = 0.0, 0
     for lensless, lensed in loader:
         lensless, lensed = lensless.to(device), lensed.to(device)
-        loss = compute_loss(model(lensless), lensed, perceptual_loss, lpips_weight)
+        loss = train_loss(model, lensless, lensed, perceptual_loss, lpips_weight)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
@@ -128,8 +133,13 @@ def build_unet(config: dict, device: str) -> torch.nn.Module:
 
 
 def run(config: dict, checkpoint_root: str | None = None, experiments_root: str | None = None, resume_run: str | None = None,
-        build_model=build_unet, device: str | None = None) -> Path:
-    """Train any model that maps a lensless image to a lensed one; Le-ADMM reuses this loop with its own builder."""
+        build_model=build_unet, device: str | None = None, train_loss=reconstruction_loss) -> Path:
+    """Train any model that maps a lensless image to a lensed one.
+
+    Le-ADMM reuses this loop with its own builder. Flow matching also passes
+    its own `train_loss`, since its training target is a velocity rather than
+    the image that `model(lensless)` produces at evaluation time.
+    """
     seed_everything(config["train"]["seed"])
     device = device or pick_device()
     exp, train_cfg = config["experiment"], config["train"]
@@ -163,13 +173,13 @@ def run(config: dict, checkpoint_root: str | None = None, experiments_root: str 
 
     for epoch in range(start_epoch, train_cfg["epochs"] + 1):
         epoch_start = time.perf_counter()
-        train_loss = train_one_epoch(model, train_loader, optimizer, perceptual_loss, train_cfg["lpips_weight"], device)
+        epoch_loss = train_one_epoch(model, train_loader, optimizer, perceptual_loss, train_cfg["lpips_weight"], device, train_loss)
         train_seconds = time.perf_counter() - epoch_start
         if epoch % train_cfg["eval_every"] == 0 or epoch == train_cfg["epochs"]:
             val_scores = evaluate(model, val_loader, perceptual_loss, train_cfg["lpips_weight"], device)
-            append_metrics(run_dir / "metrics.csv", {"epoch": epoch, "train_loss": train_loss, "train_seconds": train_seconds, **{f"val_{k}": v for k, v in val_scores.items()}})
+            append_metrics(run_dir / "metrics.csv", {"epoch": epoch, "train_loss": epoch_loss, "train_seconds": train_seconds, **{f"val_{k}": v for k, v in val_scores.items()}})
             save_preview(model, val_set, run_dir / "previews" / f"epoch_{epoch:04d}.png", device)
-            print(f"epoch {epoch}: {train_seconds:.0f}s train_loss={train_loss:.4f} val_loss={val_scores['loss']:.4f} screen_psnr={val_scores['screen_psnr']:.2f}", flush=True)
+            print(f"epoch {epoch}: {train_seconds:.0f}s train_loss={epoch_loss:.4f} val_loss={val_scores['loss']:.4f} screen_psnr={val_scores['screen_psnr']:.2f}", flush=True)
             if val_scores["loss"] < best_val_loss:
                 best_val_loss = val_scores["loss"]
                 save_checkpoint(checkpoint_dir / "best.pt", {"model": model.state_dict(), "epoch": epoch, "config": config})
