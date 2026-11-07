@@ -10,7 +10,7 @@ data:
   max_val_examples: null
   val_from_train: false
   num_workers: 2
-model: {base_channels: 32, depth: 4}
+model: {base_channels: 16, depth: 3}
 train:
   seed: 488
   epochs: 2

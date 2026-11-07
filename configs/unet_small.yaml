@@ -1,0 +1,20 @@
+# Smaller U-Net to make training on a Colab T4 practical. Same data split and loss as unet.yaml.
+experiment: {root: experiments, name: unet_small, technique: unet}
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: null        # null loads all 24,000 pairs
+  val_size: 1000
+  split_seed: 488
+  max_train_examples: 5000  # First 5,000 training rows, shared by every model
+  max_val_examples: null
+  val_from_train: false
+  num_workers: 2
+model: {base_channels: 16, depth: 3}
+train:
+  seed: 488
+  epochs: 10
+  batch_size: 8
+  learning_rate: 1.0e-4
+  lpips_weight: 1.0         # Starting value, not tuned yet
+  eval_every: 1
