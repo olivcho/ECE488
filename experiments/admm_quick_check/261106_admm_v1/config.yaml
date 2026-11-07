@@ -1,0 +1,30 @@
+experiment:
+  root: experiments
+  name: admm_quick_check
+  technique: admm
+seed: 488
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: 1
+  val_size: 100
+  split_seed: 488
+  max_val_examples: 8
+  num_workers: 0
+  batch_size: 4
+psf:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+admm:
+  tau: 0.001
+  mu1: 0.1
+  mu2: 0.1
+  mu3: 0.1
+  iterations: 100
+  eval_at:
+  - 5
+  - 10
+  - 20
+  - 50
+  - 100
+  output_scaling: max
