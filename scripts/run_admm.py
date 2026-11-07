@@ -1,4 +1,4 @@
-"""Reconstruct validation images with classical ADMM. All settings come from a YAML config."""
+"""Reconstruct one data split with classical ADMM. All settings come from a YAML config."""
 import argparse
 import copy
 import csv
@@ -13,7 +13,7 @@ from PIL import Image
 from torch.utils.data import DataLoader
 
 from lensless.admm import ForwardModel, admm_iterations, objective
-from lensless.data import LensedPairDataset, load_train_examples, split_train_val
+from lensless.data import load_test_examples, load_train_examples, select_split
 from lensless.experiment import create_run_dir, seed_everything, write_run_metadata
 from lensless.metrics import image_metrics
 from lensless.psf import IMAGE_SIZE, load_psf, prepare_psf
@@ -41,15 +41,16 @@ def synthetic_psf(seed: int) -> torch.Tensor:
     return torch.rand(3, *IMAGE_SIZE, generator=generator) ** 8
 
 
-def build_validation_set(cfg: dict) -> LensedPairDataset:
+def build_eval_set(cfg: dict):
+    """The images of one split, chosen exactly as the U-Net scripts choose them."""
     if cfg["source"] == "synthetic":
         examples = synthetic_examples(cfg["synthetic_examples"], cfg["split_seed"])
+        test_examples = examples
+    elif cfg["split"] == "test":
+        examples, test_examples = None, load_test_examples(cfg["cache_dir"])
     else:
-        examples = load_train_examples(cfg["cache_dir"], cfg["train_shards"])
-    _, val_indices = split_train_val(len(examples), cfg["val_size"], cfg["split_seed"])
-    if cfg["max_val_examples"]:
-        val_indices = val_indices[: cfg["max_val_examples"]]
-    return LensedPairDataset(examples, val_indices)
+        examples, test_examples = load_train_examples(cfg["cache_dir"], cfg["train_shards"]), None
+    return select_split(examples, cfg["split"], cfg["val_size"], cfg["split_seed"], cfg["max_examples"], test_examples)
 
 
 def build_forward_model(cfg: dict, device: str) -> ForwardModel:
@@ -99,11 +100,12 @@ def save_preview(grid: torch.Tensor, path: Path) -> None:
     Image.fromarray((grid.permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)).save(path)
 
 
-def write_metrics(path: Path, rows: dict[int, dict[str, float]]) -> None:
+def write_metrics(path: Path, rows: dict[int, dict[str, float]], split: str) -> None:
+    """Columns carry the split name, so a test-split file can never be mistaken for a validation one."""
     with path.open("w", newline="") as handle:
         writer = None
         for iteration, scores in rows.items():
-            row = {"iteration": iteration, **{f"val_{key}": value for key, value in scores.items()}}
+            row = {"iteration": iteration, **{f"{split}_{key}": value for key, value in scores.items()}}
             if writer is None:
                 writer = csv.DictWriter(handle, fieldnames=list(row))
                 writer.writeheader()
@@ -146,14 +148,15 @@ def run(config: dict, experiments_root: str | None = None) -> Path:
     run_dir = create_run_dir(experiments_root or exp["root"], exp["name"], exp["technique"])
     write_run_metadata(run_dir, config, device)
 
-    val_set = build_validation_set(config["data"])
-    loader = DataLoader(val_set, config["data"]["batch_size"], shuffle=False, num_workers=config["data"]["num_workers"])
+    split = config["data"]["split"]
+    eval_set = build_eval_set(config["data"])
+    loader = DataLoader(eval_set, config["data"]["batch_size"], shuffle=False, num_workers=config["data"]["num_workers"])
     model = build_forward_model(config["psf"], device)
     perceptual_loss = lpips.LPIPS(net="alex", verbose=False).to(device).eval().requires_grad_(False)
-    print(f"run: {run_dir} | device: {device} | val: {len(val_set)}", flush=True)
+    print(f"run: {run_dir} | device: {device} | {split}: {len(eval_set)}", flush=True)
 
     scores_by_iteration, preview = evaluate(model, loader, config["admm"], perceptual_loss, device)
-    write_metrics(run_dir / "metrics.csv", scores_by_iteration)
+    write_metrics(run_dir / "metrics.csv", scores_by_iteration, split)
     save_preview(preview, run_dir / "previews" / f"iteration_{config['admm']['iterations']:04d}.png")
     for iteration, scores in scores_by_iteration.items():
         print(f"iteration {iteration}: objective={scores['objective']:.4g} screen_psnr={scores['screen_psnr']:.2f} screen_lpips={scores['screen_lpips']:.3f} {scores['seconds_per_image']:.2f}s/image", flush=True)

@@ -18,7 +18,7 @@ def synthetic_sweep_config(root: Path) -> dict:
     return {
         "experiment": {"root": str(root), "name": "sweep_smoke", "technique": "admm"},
         "seed": 1,
-        "data": {"source": "synthetic", "synthetic_examples": 6, "val_size": 3, "split_seed": 1, "max_val_examples": 2, "num_workers": 0, "batch_size": 2},
+        "data": {"source": "synthetic", "synthetic_examples": 6, "split": "val", "val_size": 3, "split_seed": 1, "max_examples": 2, "num_workers": 0, "batch_size": 2},
         "psf": {"source": "synthetic", "seed": 1},
         "admm": {"tau": None, "mu1": None, "mu2": None, "mu3": None, "iterations": 2, "eval_at": [1], "output_scaling": "max"},
         "sweep": {"tau": [1e-3, 2e-3], "mu": [0.1]},

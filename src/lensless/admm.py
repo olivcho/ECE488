@@ -157,3 +157,16 @@ def admm_reconstruct(model: ForwardModel, b, tau: Scalar, mu1: Scalar, mu2: Scal
     for _, state in admm_iterations(model, b, tau, mu1, mu2, mu3, iterations):
         pass
     return model.crop(state.v)
+
+
+def simulate_measurement(model: ForwardModel, scene: torch.Tensor, noise_std: float, generator: torch.Generator | None = None) -> torch.Tensor:
+    """b = CM(Cᴴ scene) + noise, then scaled to full range like the dataset's images.
+
+    The lensed image stands in for the scene, which EXP-004 found reproduces the real reading closely.
+    Noise is relative to each image's peak, and the final rescale copies the NORM dataset's convention.
+    """
+    clean = model.measure(model.pad(scene))
+    peak = clean.flatten(1).amax(dim=1)[:, None, None, None]
+    noise = torch.randn(clean.shape, generator=generator, device=clean.device) * noise_std * peak
+    noisy = (clean + noise).clamp_min(0.0)
+    return noisy / noisy.flatten(1).amax(dim=1).clamp_min(1e-8)[:, None, None, None]

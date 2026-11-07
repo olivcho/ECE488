@@ -7,6 +7,8 @@ from torch.utils.data import Dataset
 
 REPO_ID = "bezzam/DiffuserCam-Lensless-Mirflickr-Dataset-NORM"
 NUM_TRAIN_SHARDS = 15
+TEST_SHARD = "data/test-00000-of-00001.parquet"
+SPLITS = ("train", "val", "test")
 
 
 def train_shard_paths(num_shards: int) -> list[str]:
@@ -16,6 +18,14 @@ def train_shard_paths(num_shards: int) -> list[str]:
     return [f"data/train-{i:05d}-of-{NUM_TRAIN_SHARDS:05d}.parquet" for i in range(num_shards)]
 
 
+def _load_parquet(cache_dir: str | Path, shard_paths: list[str]):
+    from datasets import load_dataset
+    from huggingface_hub import hf_hub_download
+
+    local_files = [hf_hub_download(REPO_ID, shard, repo_type="dataset", cache_dir=str(cache_dir)) for shard in shard_paths]
+    return load_dataset("parquet", data_files={"train": local_files}, split="train", cache_dir=str(cache_dir))
+
+
 def load_train_examples(cache_dir: str | Path, num_shards: int | None = None):
     """Load training pairs from their parquet files.
 
@@ -23,15 +33,12 @@ def load_train_examples(cache_dir: str | Path, num_shards: int | None = None):
     against the dataset card, which expects every split at full size. The test split
     is also never downloaded, so it cannot leak into training.
     """
-    from datasets import load_dataset
-    from huggingface_hub import hf_hub_download
+    return _load_parquet(cache_dir, train_shard_paths(NUM_TRAIN_SHARDS if num_shards is None else num_shards))
 
-    shard_paths = train_shard_paths(NUM_TRAIN_SHARDS if num_shards is None else num_shards)
-    local_files = [
-        hf_hub_download(REPO_ID, shard, repo_type="dataset", cache_dir=str(cache_dir))
-        for shard in shard_paths
-    ]
-    return load_dataset("parquet", data_files={"train": local_files}, split="train", cache_dir=str(cache_dir))
+
+def load_test_examples(cache_dir: str | Path):
+    """Load the 999 held-out test pairs. Only final reported results should touch them."""
+    return _load_parquet(cache_dir, [TEST_SHARD])
 
 
 def split_train_val(num_examples: int, val_size: int, seed: int) -> tuple[list[int], list[int]]:
@@ -65,3 +72,18 @@ class LensedPairDataset(Dataset):
     def __getitem__(self, position: int) -> tuple[torch.Tensor, torch.Tensor]:
         example = self.examples[self.indices[position]]
         return image_to_tensor(example["lensless"]), image_to_tensor(example["lensed"])
+
+
+def select_split(train_examples, split: str, val_size: int, seed: int, max_examples: int | None = None, test_examples=None) -> LensedPairDataset:
+    """The same images for every model: train and val are carved from the training parquet with one
+    seed, so the U-Net, ADMM and Le-ADMM all see identical rows, and test is the dataset's own split."""
+    if split not in SPLITS:
+        raise ValueError(f"split must be one of {SPLITS}, got {split!r}")
+    if split == "test":
+        if test_examples is None:
+            raise ValueError("the test split needs test_examples")
+        indices = list(range(len(test_examples)))
+        return LensedPairDataset(test_examples, indices[:max_examples] if max_examples else indices)
+    train_indices, val_indices = split_train_val(len(train_examples), val_size, seed)
+    indices = train_indices if split == "train" else val_indices
+    return LensedPairDataset(train_examples, indices[:max_examples] if max_examples else indices)

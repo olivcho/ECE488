@@ -1,0 +1,19 @@
+# Score a trained checkpoint on one split of the shared images, and test transfer to a second camera.
+# Pass the checkpoint with --checkpoint. Use split test only for the final reported numbers.
+experiment: {root: experiments, name: evaluate, technique: evaluate}
+seed: 488
+checkpoint: null
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: null        # Only matters for split train or val; the test split is its own file
+  split: val
+  val_size: 1000
+  split_seed: 488
+  max_examples: null
+  num_workers: 2
+  batch_size: 8
+psf: {source: huggingface, cache_dir: data/raw/huggingface}
+psf_swap:
+  new_psf: {transform: rotate180}   # Or {path: other_camera.tiff}. Rotation keeps the diffuser's statistics and moves every speckle
+  noise_std: 0.01                   # Gaussian noise relative to each simulated image's peak

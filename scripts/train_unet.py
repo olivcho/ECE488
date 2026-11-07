@@ -13,7 +13,7 @@ from PIL import Image
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 
-from lensless.data import LensedPairDataset, load_train_examples, split_train_val
+from lensless.data import load_train_examples, select_split
 from lensless.experiment import create_run_dir, git_state, seed_everything, write_run_metadata
 from lensless.metrics import image_metrics
 from lensless.unet import UNet
@@ -37,20 +37,17 @@ def synthetic_examples(count: int, seed: int) -> list[dict]:
     ]
 
 
-def build_datasets(cfg: dict) -> tuple[LensedPairDataset, LensedPairDataset]:
+def build_datasets(cfg: dict):
+    """Both splits come from select_split, the same helper the ADMM and evaluation scripts use."""
     if cfg["source"] == "synthetic":
         examples = synthetic_examples(cfg["synthetic_examples"], cfg["split_seed"])
     else:
         examples = load_train_examples(cfg["cache_dir"], cfg["train_shards"])
-    train_indices, val_indices = split_train_val(len(examples), cfg["val_size"], cfg["split_seed"])
-    if cfg["max_train_examples"]:
-        train_indices = train_indices[: cfg["max_train_examples"]]
+    train_set = select_split(examples, "train", cfg["val_size"], cfg["split_seed"], cfg["max_train_examples"])
     # A deliberate overfit check scores the training images, to test memorization.
     if cfg["val_from_train"]:
-        val_indices = train_indices
-    elif cfg["max_val_examples"]:
-        val_indices = val_indices[: cfg["max_val_examples"]]
-    return LensedPairDataset(examples, train_indices), LensedPairDataset(examples, val_indices)
+        return train_set, train_set
+    return train_set, select_split(examples, "val", cfg["val_size"], cfg["split_seed"], cfg["max_val_examples"])
 
 
 def compute_loss(prediction, target, perceptual_loss, lpips_weight: float) -> torch.Tensor:
