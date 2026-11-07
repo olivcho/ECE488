@@ -20,6 +20,12 @@ Scores ADMM with total variation on validation images at several iteration count
 uv run python scripts/run_admm.py --config configs/admm_quick.yaml
 uv run python scripts/run_admm.py --config configs/admm.yaml
 ```
+Tune the penalties with a grid sweep, one run folder per (τ, μ) point. A rerun skips finished points, and `--set key=value` overrides any config value for a single run:
+```bash
+uv run python scripts/sweep_admm.py --config configs/admm_sweep.yaml
+uv run python scripts/run_admm.py --config configs/admm.yaml --set admm.tau=3e-4 --set data.max_val_examples=null
+```
+On Colab, use `notebooks/run_admm_colab.ipynb`.
 
 ## Troubleshooting
 If a dataset download stalls with no progress, retry with Hugging Face's Xet downloader turned off:
