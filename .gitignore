@@ -20,3 +20,6 @@ wandb/
 *.ckpt
 *.parquet
 experiments/*/*/previews/
+
+# Local assistant instructions
+CLAUDE.md
