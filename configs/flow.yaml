@@ -1,0 +1,27 @@
+# Conditional flow matching: a time-conditioned U-Net with bottleneck self-attention predicts the velocity
+# from noise to the lensed image, given the lensless measurement. Same data split, training rows and
+# U-Net size as unet_small.yaml, so the two are directly comparable. Sized for a Colab T4.
+experiment: {root: experiments, name: flow_unet, technique: flow}
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: null        # null loads all 24,000 pairs
+  val_size: 1000
+  split_seed: 488
+  max_train_examples: 5000  # First 5,000 training rows, shared by every model
+  max_val_examples: null
+  val_from_train: false
+  num_workers: 2
+model:
+  base_channels: 16
+  depth: 3
+  time_dim: 128
+  attention_heads: 4
+  sample_steps: 20          # Euler steps at validation and evaluation; each is one network pass
+train:
+  seed: 488
+  epochs: 10
+  batch_size: 8
+  learning_rate: 1.0e-4
+  lpips_weight: 0.0         # Training regresses a velocity, so this only affects which epoch becomes best.pt
+  eval_every: 1

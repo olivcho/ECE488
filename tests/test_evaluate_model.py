@@ -99,3 +99,14 @@ def test_prepared_psf_is_recovered_exactly_from_the_forward_model():
     psf = torch.rand(3, 6, 8)
     recovered = evaluate_model.prepare_psf_from_model(ForwardModel(psf))
     assert torch.allclose(recovered, psf, atol=1e-6)
+
+
+def test_flow_checkpoint_samples_under_three_conditions(tmp_path):
+    train_flow, evaluate_model = load_script("train_flow"), load_script("evaluate_model")
+    from test_train_flow import synthetic_config
+
+    train_dir = train_flow.run(synthetic_config(tmp_path))
+    run_dir = evaluate_model.run(evaluation_config(tmp_path, train_dir / "checkpoints" / "best.pt"))
+    rows = list(csv.DictReader((run_dir / "metrics.csv").open()))
+    assert [row["condition"] for row in rows] == ["real", "simulated_same_psf", "new_psf_no_swap"]
+    assert all(float(row["val_screen_psnr"]) > 0 for row in rows)
