@@ -5,17 +5,18 @@
 __pycache__/
 *.pyc
 .venv/
-venv/
+.pytest_cache/
+*.egg-info/
 
 # Jupyter
 .ipynb_checkpoints/
 
-# Data, checkpoints and run outputs
+# Data and generated outputs stay out of Git
 data/
 checkpoints/
-runs/
 wandb/
 *.pt
 *.pth
 *.ckpt
 *.parquet
+experiments/*/*/previews/
