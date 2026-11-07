@@ -17,11 +17,21 @@ def train_shard_paths(num_shards: int) -> list[str]:
 
 
 def load_train_examples(cache_dir: str | Path, num_shards: int | None = None):
-    """Load training pairs. The test split is deliberately not available here."""
-    from datasets import load_dataset
+    """Load training pairs from their parquet files.
 
-    data_files = None if num_shards is None else {"train": train_shard_paths(num_shards)}
-    return load_dataset(REPO_ID, data_files=data_files, split="train", cache_dir=str(cache_dir))
+    Reading the files directly has two benefits. A subset no longer fails the checks
+    against the dataset card, which expects every split at full size. The test split
+    is also never downloaded, so it cannot leak into training.
+    """
+    from datasets import load_dataset
+    from huggingface_hub import hf_hub_download
+
+    shard_paths = train_shard_paths(NUM_TRAIN_SHARDS if num_shards is None else num_shards)
+    local_files = [
+        hf_hub_download(REPO_ID, shard, repo_type="dataset", cache_dir=str(cache_dir))
+        for shard in shard_paths
+    ]
+    return load_dataset("parquet", data_files={"train": local_files}, split="train", cache_dir=str(cache_dir))
 
 
 def split_train_val(num_examples: int, val_size: int, seed: int) -> tuple[list[int], list[int]]:
