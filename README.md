@@ -27,6 +27,13 @@ uv run python scripts/run_admm.py --config configs/admm.yaml --set admm.tau=3e-4
 ```
 On Colab, use `notebooks/run_admm_colab.ipynb`.
 
+## Train Le-ADMM
+Unrolls the same ADMM for 5 iterations with learned τ, μ₁, μ₂, μ₃ per iteration. `le_admm.yaml` adds a U-Net denoiser, `le_admm_plain.yaml` learns only the penalties. The PSF enters through the forward model, not the weights, so a trained network transfers to a new camera by rebuilding the forward model from its PSF.
+```bash
+uv run python scripts/train_le_admm.py --config configs/le_admm_plain.yaml
+```
+On Colab, use `notebooks/train_le_admm_colab.ipynb`.
+
 ## Troubleshooting
 If a dataset download stalls with no progress, retry with Hugging Face's Xet downloader turned off:
 
