@@ -1,5 +1,6 @@
 """Reconstruct validation images with classical ADMM. All settings come from a YAML config."""
 import argparse
+import copy
 import csv
 import time
 from pathlib import Path
@@ -109,6 +110,35 @@ def write_metrics(path: Path, rows: dict[int, dict[str, float]]) -> None:
             writer.writerow(row)
 
 
+def parse_override(text: str) -> tuple[str, object]:
+    """Turn 'admm.tau=3e-4' into a dotted key and a YAML-typed value."""
+    key, separator, raw_value = text.partition("=")
+    if not separator:
+        raise ValueError(f"override {text!r} must look like admm.tau=3e-4")
+    value = yaml.safe_load(raw_value)
+    if isinstance(value, str):
+        # YAML 1.1 reads '3e-4' as a string because it wants a dot in the mantissa, so accept Python's float syntax too.
+        try:
+            value = float(value)
+        except ValueError:
+            pass
+    return key, value
+
+
+def apply_overrides(config: dict, overrides: dict[str, object]) -> dict:
+    """Return a copy with dotted keys replaced, so the run folder records the values that actually ran."""
+    config = copy.deepcopy(config)
+    for key, value in overrides.items():
+        *parents, leaf = key.split(".")
+        node = config
+        for parent in parents:
+            node = node[parent]
+        if leaf not in node:
+            raise KeyError(f"{key!r} is not in the config")
+        node[leaf] = value
+    return config
+
+
 def run(config: dict, experiments_root: str | None = None) -> Path:
     seed_everything(config["seed"])
     device = pick_device()
@@ -134,8 +164,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", required=True)
     parser.add_argument("--experiments-root", help="Create run folders here, such as a Google Drive folder")
+    parser.add_argument("--set", action="append", default=[], metavar="KEY=VALUE", help="Override a config value, such as admm.tau=3e-4")
     args = parser.parse_args()
-    run(yaml.safe_load(Path(args.config).read_text()), args.experiments_root)
+    config = apply_overrides(yaml.safe_load(Path(args.config).read_text()), dict(map(parse_override, args.set)))
+    run(config, args.experiments_root)
 
 
 if __name__ == "__main__":

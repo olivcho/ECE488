@@ -1,0 +1,27 @@
+# Grid over the TV weight tau and the shared penalty mu, scored on 200 validation images from the full-data split.
+# Each grid point becomes its own run folder under experiments/admm_sweep/, and a rerun skips finished points.
+# The grid is centred on the 4-image probe's best point (mu 0.03, tau 1e-3); mu 1 was dropped because it converged too slowly.
+# Run with scripts/sweep_admm.py, not run_admm.py: the null solver values are filled in per grid point.
+experiment: {root: experiments, name: admm_sweep, technique: admm}
+seed: 488
+data:
+  source: huggingface
+  cache_dir: data/raw/huggingface
+  train_shards: null        # null matches the U-Net's validation split, which needs every shard
+  val_size: 1000
+  split_seed: 488
+  max_val_examples: 200
+  num_workers: 0
+  batch_size: 8
+psf: {source: huggingface, cache_dir: data/raw/huggingface}
+admm:
+  tau: null
+  mu1: null
+  mu2: null
+  mu3: null
+  iterations: 200           # The quick check was still improving at 100
+  eval_at: [20, 50, 100, 200]
+  output_scaling: max
+sweep:
+  tau: [3.0e-4, 1.0e-3, 3.0e-3]
+  mu: [0.01, 0.03, 0.1]
