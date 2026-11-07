@@ -34,6 +34,12 @@ uv run python scripts/train_le_admm.py --config configs/le_admm_plain.yaml
 ```
 On Colab, use `notebooks/train_le_admm_colab.ipynb`.
 
+## Score a checkpoint and test the PSF swap
+Every script picks its images with the same split helper, so the U-Net, ADMM and Le-ADMM report on identical train, val and test rows. `evaluate_model.py` scores a U-Net or Le-ADMM checkpoint on one split, under real measurements, measurements simulated with the training PSF, and measurements simulated with a second PSF both before and after swapping it into Le-ADMM. Use `data.split=test` only for final numbers.
+```bash
+uv run python scripts/evaluate_model.py --config configs/evaluate.yaml --checkpoint experiments/le_admm_plain/<run>/checkpoints/best.pt --set data.split=test
+```
+
 ## Troubleshooting
 If a dataset download stalls with no progress, retry with Hugging Face's Xet downloader turned off:
 

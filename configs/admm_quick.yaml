@@ -5,9 +5,10 @@ data:
   source: huggingface
   cache_dir: data/raw/huggingface
   train_shards: 1
+  split: val                # train, val or test. Use test only for the final reported numbers
   val_size: 100
   split_seed: 488
-  max_val_examples: 8
+  max_examples:     8
   num_workers: 0
   batch_size: 4
 psf: {source: huggingface, cache_dir: data/raw/huggingface}
