@@ -7,7 +7,7 @@ Built from every run folder under `experiments/`. One table per split; rows on d
 - `unet_overfit_check/261106_unet_v1` has no `metrics.csv`: configured for 400 epochs with `eval_every: 50`, it never reached an evaluation, so it stopped early. `run_info.json` records no stop reason; `261106_unet_v2` reruns the same config.
 - All four runs have `uncommitted_changes: true` in `run_info.json`; the U-Net runs record commit `33824ad`, which is not in the repository history.
 - U-Net overfit rows score their own 4 training images (`val_from_train: true`), so they sit in the train table and are not comparable with the ADMM val row.
-- `admm_quick_check` uses a 1-shard split (`train_shards: 1`, `val_size: 100`), not the full-data split (`val_size: 1000`) used by `admm.yaml` and the learned-model configs; its 8 images are not a subset of the full-data val split.
+- `admm_quick_check` uses a 1-shard split (`train_shards: 1`, `val_size: 100`), not the full-data split (`val_size: 1000`) used by `admm.yaml` and the learned-model configs, so its 8 images are a different image set.
 - No same-split comparison of a learned model with ADMM exists yet, so the "learned model below ADMM" check cannot be run.
 - No NaN/inf or flat metrics, no rising `val_loss`, no test-split runs.
 
