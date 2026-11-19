@@ -1,55 +1,42 @@
-# Lensless Reconstruction Transfer
+# Lensless Camera Reconstruction
 
-Tests whether physics-informed reconstruction networks trained on one DiffuserCam generalize to a new camera. See `docs/` for the proposal and `CLAUDE.md` for project conventions.
+Recover RGB images from diffuser-camera measurements with a calibrated optical model and learned reconstruction. The PyTorch implementation compares total-variation ADMM, a direct U-Net, and learned ADMM with and without a U-Net denoiser.
 
-## Setup
+[Presentation (PDF)](docs/lensless-camera-reconstruction.pdf) · [Experiment logs](docs/results.md) · [References](docs/references.md)
+
+## Results
+
+![Four scenes comparing the raw sensor measurement, ADMM, Le-ADMM, U-Net, Le-ADMM-U, and the lensed reference](docs/reconstruction-comparison.webp)
+
+Le-ADMM-U outperformed the standalone U-Net by **1.8 dB PSNR** in the [presentation comparison](docs/lensless-camera-reconstruction.pdf#page=9).
+
+| Method | PSNR (dB) ↑ | SSIM ↑ | LPIPS ↓ |
+| --- | ---: | ---: | ---: |
+| ADMM with total variation | 15.2 | 0.51 | 0.50 |
+| Le-ADMM | 14.8 | 0.48 | 0.47 |
+| U-Net | 18.9 | 0.59 | 0.26 |
+| Le-ADMM-U | **20.7** | **0.66** | **0.23** |
+
+The data are paired lensless captures and lensed references from the [DiffuserCam Lensless MIRFlickr dataset](https://huggingface.co/datasets/bezzam/DiffuserCam-Lensless-Mirflickr-Dataset-NORM). The table reports the presentation results. The [checked-in logs](docs/results.md) document smaller development runs on different image sets.
+
+## Method
+
+- **ADMM** fits the sensor measurement using convolution with the camera’s point-spread function (PSF) followed by sensor cropping. Total variation regularizes the reconstruction, and a nonnegativity constraint keeps pixel values physical.
+- **Le-ADMM** unrolls five ADMM iterations and learns the regularization and penalty parameters per iteration. **Le-ADMM-U** adds a U-Net after the last iteration to recover detail.
+- **U-Net** maps the measurement directly to an image. A separate [conditional flow-matching model](configs/flow.yaml) is also available.
+
+The [evaluation script](scripts/evaluate_model.py) scores real captures and measurements simulated with the original and a second PSF. For Le-ADMM it also tests swapping in the second PSF while keeping the learned weights fixed.
+
+## Run
+
+Use Python 3.11+ and [uv](https://docs.astral.sh/uv/). Training runs can also be launched from the [Colab notebooks](notebooks/).
+
 ```bash
-uv sync
+uv sync --locked
 uv run pytest
-```
-
-## Train the U-Net baseline
-```bash
-uv run python scripts/train_unet.py --config configs/unet_overfit.yaml
-uv run python scripts/train_unet.py --config configs/unet.yaml
-```
-
-## Run the classical ADMM baseline
-Scores ADMM with total variation on validation images at several iteration counts. Each setting gets its own run folder.
-```bash
 uv run python scripts/run_admm.py --config configs/admm_quick.yaml
-uv run python scripts/run_admm.py --config configs/admm.yaml
-```
-Tune the penalties with a grid sweep, one run folder per (τ, μ) point. A rerun skips finished points, and `--set key=value` overrides any config value for a single run:
-```bash
-uv run python scripts/sweep_admm.py --config configs/admm_sweep.yaml
-uv run python scripts/run_admm.py --config configs/admm.yaml --set admm.tau=3e-4 --set data.max_val_examples=null
-```
-On Colab, use `notebooks/run_admm_colab.ipynb`.
-
-## Train Le-ADMM
-Unrolls the same ADMM for 5 iterations with learned τ, μ₁, μ₂, μ₃ per iteration. `le_admm.yaml` adds a U-Net denoiser, `le_admm_plain.yaml` learns only the penalties. The PSF enters through the forward model, not the weights, so a trained network transfers to a new camera by rebuilding the forward model from its PSF.
-```bash
-uv run python scripts/train_le_admm.py --config configs/le_admm_plain.yaml
-```
-On Colab, use `notebooks/train_le_admm_colab.ipynb`.
-
-## Train the flow-matching model
-A conditional flow-matching model: a time-conditioned U-Net with self-attention at the bottleneck predicts the velocity from Gaussian noise to the lensed image, given the lensless measurement as extra input channels. Training samples t uniformly, forms x_t = (1 − t)·noise + t·target and regresses the velocity target − noise with MSE, so `train_loss` in `metrics.csv` is a velocity error rather than an image error. Validation and evaluation sample with a fixed-step Euler integrator (`model.sample_steps`, 20 by default) and score the samples like every other model. `flow.yaml` uses the same data split, training rows and U-Net size as `unet_small.yaml`.
-```bash
-uv run python scripts/train_flow.py --config configs/flow.yaml
-```
-On Colab, use `notebooks/train_flow_colab.ipynb`, starting with `configs/flow_colab_test.yaml` to time one epoch.
-
-## Score a checkpoint and test the PSF swap
-Every script picks its images with the same split helper, so the U-Net, ADMM, Le-ADMM and flow model report on identical train, val and test rows. `evaluate_model.py` scores a U-Net, Le-ADMM or flow-matching checkpoint on one split, under real measurements, measurements simulated with the training PSF, and measurements simulated with a second PSF both before and after swapping it into Le-ADMM. Use `data.split=test` only for final numbers.
-```bash
-uv run python scripts/evaluate_model.py --config configs/evaluate.yaml --checkpoint experiments/le_admm_plain/<run>/checkpoints/best.pt --set data.split=test
-```
-
-## Troubleshooting
-If a dataset download stalls with no progress, retry with Hugging Face's Xet downloader turned off:
-
-```bash
-HF_HUB_DISABLE_XET=1 uv run python scripts/train_unet.py --config configs/unet_overfit.yaml
+uv run python scripts/train_unet.py --config configs/unet_small.yaml
+uv run python scripts/train_le_admm.py --config configs/le_admm.yaml
+uv run python scripts/evaluate_model.py --config configs/evaluate.yaml \
+  --checkpoint /path/to/best.pt --set data.split=test
 ```
