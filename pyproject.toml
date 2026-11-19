@@ -1,7 +1,7 @@
 [project]
 name = "lensless"
 version = "0.1.0"
-description = "Lensless reconstruction transfer experiments for ECE488"
+description = "Physics-informed lensless image reconstruction and camera transfer"
 requires-python = ">=3.11"
 dependencies = [
     "datasets>=5.1.0",
